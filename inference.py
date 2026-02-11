@@ -55,7 +55,6 @@ if __name__ == '__main__':
         if f.lower().endswith(('.jpg', '.png', '.jpeg'))
     ]
 
-
     results = []
 
     # inference
