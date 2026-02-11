@@ -10,9 +10,9 @@ python evaluate.py \
     --FAFormer_layers 2 \
     --FAFormer_reduction_factor 1 \
     --FAFormer_head 2 \
-    --num_workers 4 \
+    --num_workers 0 \
     --seed 3407 \
-    --weight data_path/training_setting_1.pth
+    --weight data_path/training_setting_df.pth
 
 
 # EXP_NAME="training_setting_2"

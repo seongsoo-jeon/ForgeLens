@@ -15,8 +15,9 @@ from torch.utils.data.sampler import WeightedRandomSampler
 from sklearn.metrics import accuracy_score, average_precision_score
 from torch.cuda.amp import autocast, GradScaler
 
-vals = ['progan', 'stylegan', 'biggan', 'cyclegan', 'stargan', 'gaugan', 'deepfake', 'seeingdark', 'san', 'crn', 'imle', 'guided', 'ldm_200', 'ldm_200_cfg', 'ldm_100', 'glide_100_27', 'glide_50_27', 'glide_100_10', 'dalle']
-multiclass = [1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+#vals = ['progan', 'stylegan', 'biggan', 'cyclegan', 'stargan', 'gaugan', 'deepfake', 'seeingdark', 'san', 'crn', 'imle', 'guided', 'ldm_200', 'ldm_200_cfg', 'ldm_100', 'glide_100_27', 'glide_50_27', 'glide_100_10', 'dalle']
+vals = ['deepfake']
+multiclass = [0]
 
 # vals = ['ADM', 'BigGAN', 'glide', 'Midjourney', 'stable_diffusion_v_1_4', 'stable_diffusion_v_1_5', 'VQDM', 'wukong']
 # multiclass = [0, 0, 0, 0, 0, 0, 0, 0]
@@ -67,29 +68,23 @@ if __name__ == '__main__':
     # test
     for val_id, val in enumerate(vals):
         sub_test_data_root = '{}/{}'.format(opt.eval_data_root, val)
-        if multiclass[val_id] == 1:
-            classes = os.listdir(sub_test_data_root)
-        else:
-            classes = ['']
+        classes = ['']
 
         val_dataset = get_dataset_test(sub_test_data_root, classes)
         sampler = get_bal_sampler(val_dataset)
         val_loader = torch.utils.data.DataLoader(val_dataset,
                                                  batch_size=opt.batch_size,
                                                  shuffle=False,
-                                                 drop_last=True,
+                                                 drop_last=False, #원래는 True
                                                  sampler=sampler,
                                                  num_workers=opt.num_workers)
 
-        val_accs = []
-        val_aps = []
         all_targets = []
         all_pre_probs = []
 
-        for data, target in tqdm(val_loader):
+        for data, target in tqdm(val_loader, desc=f"Evaluating {val}"):
             data, target = data.cuda(), target.cuda()
             with autocast():
-
                 with torch.no_grad():
                     if opt.eval_stage == 1:
                         pre, _ = model(data)
@@ -99,23 +94,14 @@ if __name__ == '__main__':
                     pre_prob = torch.sigmoid(pre).cpu()
                     target = target.cpu()
 
-                    acc = accuracy_score(target.numpy(), pre_prob.numpy() > 0.5)
-                    ap = average_precision_score(target.numpy(), pre_prob.numpy())
-
-                    val_accs.append(acc)
-                    val_aps.append(ap)
-
                     all_targets.extend(target.numpy())
                     all_pre_probs.extend(pre_prob.numpy())
 
-        val_mean_acc = np.mean(val_accs)
-        val_mean_ap = np.mean(val_aps)
-        print(
-            "({} {:10}) acc: {:.2f}; ap: {:.2f}".format(val_id + 1, val, val_mean_acc * 100, val_mean_ap * 100))
-        accs.append(val_mean_acc)
-        aps.append(val_mean_ap)
+        all_targets = np.array(all_targets)
+        all_pre_probs = np.array(all_pre_probs)
+        
+        final_acc = accuracy_score(all_targets, all_pre_probs > 0.5)
+        final_ap = average_precision_score(all_targets, all_pre_probs)
 
-    mean_acc = np.mean(accs) * 100
-    mean_ap = np.mean(aps) * 100
-    print("({} {:10}) acc: {:.2f}; ap: {:.2f}".format('*', 'Mean', mean_acc, mean_ap))
-    print('*'*60)
+        print(f"\n>> [Result] {val} - Acc: {final_acc*100:.2f}%, AP: {final_ap*100:.2f}%")
+
